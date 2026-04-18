@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { GitCompare, Trophy, Sparkles, X, Star, CheckCircle2, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 interface ComparisonResult {
   summary: string;
@@ -93,7 +94,7 @@ export default function Compare() {
     setError(null);
     setResult(null);
     try {
-      const resp = await fetch(`/api/compare`, {
+      const resp = await fetch(`${API_BASE}/api/compare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tileIds: selectedIds }),
