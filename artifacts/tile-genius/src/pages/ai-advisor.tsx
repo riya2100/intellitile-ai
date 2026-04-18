@@ -11,6 +11,7 @@ import { MessageSquare, Send, Sparkles, Plus, Trash2, Loader2, Bot, User } from 
 import { toast } from "sonner";
 import type { Message } from "@workspace/api-client-react/src/generated/api.schemas";
 import { cn } from "@/lib/utils";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 const QUICK_PROMPTS = [
   "Suggest tiles for a modern industrial kitchen",
@@ -68,7 +69,7 @@ export default function AiAdvisor() {
   const safeDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/api/conversations/${id}`, { method: "DELETE" });
       if (activeConvId === id) {
         setActiveConvId(null);
         setMessages([]);
@@ -89,7 +90,7 @@ export default function AiAdvisor() {
 
     if (!targetConvId) {
       try {
-        const res = await fetch("/api/conversations", {
+        const res = await fetch(`${API_BASE}/api/conversations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: input.substring(0, 40) }),
@@ -130,7 +131,7 @@ export default function AiAdvisor() {
     ]);
 
     try {
-      const response = await fetch(`/api/conversations/${targetConvId}/messages`, {
+      const response = await fetch(`${API_BASE}/api/conversations/${targetConvId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: userMessage.content }),
