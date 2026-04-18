@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "TileGenius – AI Design Assistant"
+version = "1.0.0"
+id = "artifacts/tile-genius"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24584
+
+[services.development]
+run = "pnpm --filter @workspace/tile-genius run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/tile-genius", "run", "build" ]
+publicDir = "artifacts/tile-genius/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24584"
+BASE_PATH = "/"

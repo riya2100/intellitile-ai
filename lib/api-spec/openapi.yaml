@@ -1,0 +1,610 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: TileGenius AI Platform API — Somany Ceramics
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: tiles
+    description: Tile catalog management
+  - name: recommendations
+    description: AI tile recommendations
+  - name: visualizer
+    description: AI room visualizer
+  - name: conversations
+    description: AI chat conversations
+  - name: analytics
+    description: Analytics and insights
+  - name: openai
+    description: OpenAI operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /tiles:
+    get:
+      operationId: listTiles
+      tags: [tiles]
+      summary: List all tiles with optional filters
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: room
+          in: query
+          schema:
+            type: string
+        - name: finish
+          in: query
+          schema:
+            type: string
+        - name: priceMin
+          in: query
+          schema:
+            type: number
+        - name: priceMax
+          in: query
+          schema:
+            type: number
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: List of tiles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TileListResponse"
+
+  /tiles/{id}:
+    get:
+      operationId: getTile
+      tags: [tiles]
+      summary: Get a single tile by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tile detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tile"
+        "404":
+          description: Not found
+
+  /tiles/similar/{id}:
+    get:
+      operationId: getSimilarTiles
+      tags: [tiles]
+      summary: Get visually similar tiles (AI semantic similarity)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Similar tiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tile"
+
+  /tiles/trending:
+    get:
+      operationId: getTrendingTiles
+      tags: [tiles]
+      summary: Get trending tiles by room type
+      parameters:
+        - name: room
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trending tiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tile"
+
+  /recommendations:
+    post:
+      operationId: getAiRecommendations
+      tags: [recommendations]
+      summary: Get AI-powered tile recommendations from natural language
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationRequest"
+      responses:
+        "200":
+          description: AI recommendation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationResponse"
+
+  /visualizer/generate:
+    post:
+      operationId: generateRoomVisualization
+      tags: [visualizer]
+      summary: Generate AI room visualization with selected tile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisualizerRequest"
+      responses:
+        "200":
+          description: Generated room image (base64)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisualizerResponse"
+
+  /visualizer/mood-board:
+    post:
+      operationId: generateMoodBoard
+      tags: [visualizer]
+      summary: Generate AI mood board for a design style
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoodBoardRequest"
+      responses:
+        "200":
+          description: Mood board image (base64)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisualizerResponse"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List all conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+    post:
+      operationId: createConversation
+      tags: [conversations]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TileConversationCreateBody"
+      responses:
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationWithMessages"
+    delete:
+      operationId: deleteConversation
+      tags: [conversations]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /conversations/{id}/messages:
+    post:
+      operationId: sendTileChat
+      tags: [conversations, openai]
+      summary: Send a message to tile AI chat (streaming SSE)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TileChatMessageBody"
+      responses:
+        "200":
+          description: Streaming SSE response
+
+  /analytics/dashboard:
+    get:
+      operationId: getDashboardStats
+      tags: [analytics]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /analytics/popular-rooms:
+    get:
+      operationId: getPopularRooms
+      tags: [analytics]
+      summary: Get popular room types from recommendations
+      responses:
+        "200":
+          description: Popular rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoomPopularity"
+
+  /analytics/design-trends:
+    get:
+      operationId: getDesignTrends
+      tags: [analytics]
+      summary: Get AI-inferred design trends from user searches
+      responses:
+        "200":
+          description: Design trends
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DesignTrend"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    Tile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+          description: "ceramic_wall, ceramic_floor, polished_vitrified, glazed_vitrified, large_slab"
+        finish:
+          type: string
+          description: "matte, glossy, satin, textured, rustic"
+        room:
+          type: string
+          description: "living_room, bedroom, kitchen, bathroom, outdoor"
+        size:
+          type: string
+          description: "e.g. 600x600, 800x800, 1200x2400"
+        pricePerSqft:
+          type: number
+        color:
+          type: string
+        pattern:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        thumbnailUrl:
+          type: string
+        collection:
+          type: string
+        isNew:
+          type: boolean
+        isBestSeller:
+          type: boolean
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        aiEmbeddingText:
+          type: string
+          description: Text used for semantic search
+      required: [id, name, sku, category, finish, room, size, pricePerSqft, color, description, imageUrl]
+
+    TileListResponse:
+      type: object
+      properties:
+        tiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tile"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [tiles, total, page, totalPages]
+
+    RecommendationRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Natural language description of what the user wants
+        roomType:
+          type: string
+        budget:
+          type: number
+          description: Max price per sqft
+        stylePreference:
+          type: string
+        sessionId:
+          type: string
+      required: [query]
+
+    RecommendationResponse:
+      type: object
+      properties:
+        tiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tile"
+        reasoning:
+          type: string
+          description: AI explanation of why these tiles were recommended
+        styleProfile:
+          type: string
+          description: Detected design style from user query
+        alternativeSuggestions:
+          type: array
+          items:
+            type: string
+      required: [tiles, reasoning]
+
+    VisualizerRequest:
+      type: object
+      properties:
+        tileId:
+          type: integer
+        roomType:
+          type: string
+        roomDescription:
+          type: string
+        uploadedImageBase64:
+          type: string
+          description: Optional user-uploaded room photo (base64)
+      required: [tileId, roomType]
+
+    MoodBoardRequest:
+      type: object
+      properties:
+        style:
+          type: string
+          description: "modern, rustic, scandinavian, royal, industrial, bohemian, minimalist"
+        roomType:
+          type: string
+        colorPalette:
+          type: string
+        tileIds:
+          type: array
+          items:
+            type: integer
+      required: [style, roomType]
+
+    VisualizerResponse:
+      type: object
+      properties:
+        imageBase64:
+          type: string
+        prompt:
+          type: string
+          description: The AI prompt used to generate the image
+        tileDetails:
+          type: string
+      required: [imageBase64]
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        messageCount:
+          type: integer
+      required: [id, title, createdAt, updatedAt]
+
+    ConversationWithMessages:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+      required: [id, title, createdAt, updatedAt, messages]
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        tileIds:
+          type: array
+          items:
+            type: integer
+          description: Tile IDs referenced in this message
+      required: [id, conversationId, role, content, createdAt]
+
+    TileConversationCreateBody:
+      type: object
+      properties:
+        title:
+          type: string
+      required: [title]
+
+    TileChatMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+        tileContext:
+          type: array
+          items:
+            type: integer
+          description: Optional tile IDs to include as context
+      required: [content]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalTiles:
+          type: integer
+        totalCategories:
+          type: integer
+        totalRecommendations:
+          type: integer
+        totalVisualizations:
+          type: integer
+        totalConversations:
+          type: integer
+        avgRating:
+          type: number
+        topCategory:
+          type: string
+        newArrivalsCount:
+          type: integer
+      required: [totalTiles, totalCategories, totalRecommendations, totalVisualizations, totalConversations, avgRating]
+
+    RoomPopularity:
+      type: object
+      properties:
+        room:
+          type: string
+        count:
+          type: integer
+        percentage:
+          type: number
+      required: [room, count, percentage]
+
+    DesignTrend:
+      type: object
+      properties:
+        trend:
+          type: string
+        description:
+          type: string
+        score:
+          type: number
+        exampleTileIds:
+          type: array
+          items:
+            type: integer
+      required: [trend, description, score]
