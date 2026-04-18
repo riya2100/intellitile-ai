@@ -6,6 +6,86 @@ import { eq, desc, count, inArray } from "drizzle-orm";
 
 const router = Router();
 
+router.get("/conversations", async (req, res) => {
+  try {
+    const convs = await db.select().from(conversations).orderBy(desc(conversations.updatedAt)).limit(50);
+
+    const withCounts = await Promise.all(
+      convs.map(async (conv) => {
+        const msgCount = await db
+          .select({ count: count() })
+          .from(messages)
+          .where(eq(messages.conversationId, conv.id));
+        return {
+          ...conv,
+          messageCount: Number(msgCount[0]?.count ?? 0),
+        };
+      })
+    );
+
+    res.json(withCounts);
+  } catch (err) {
+    req.log.error({ err }, "Error listing conversations");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/conversations", async (req, res) => {
+  try {
+    const body = CreateConversationBody.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: "Invalid request body" });
+      return;
+    }
+
+    const [conv] = await db
+      .insert(conversations)
+      .values({ title: body.data.title })
+      .returning();
+
+    res.status(201).json({ ...conv, messageCount: 0 });
+  } catch (err) {
+    req.log.error({ err }, "Error creating conversation");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/conversations/:id", async (req, res) => {
+  try {
+    const conv = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, req.params.id))
+      .limit(1);
+
+    if (!conv[0]) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    const msgs = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, req.params.id))
+      .orderBy(messages.createdAt);
+
+    res.json({ ...conv[0], messages: msgs });
+  } catch (err) {
+    req.log.error({ err }, "Error getting conversation");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/conversations/:id", async (req, res) => {
+  try {
+    await db.delete(conversations).where(eq(conversations.id, req.params.id));
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Error deleting conversation");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/conversations/:id/messages", async (req, res) => {
   try {
     const body = SendTileChatBody.safeParse(req.body);
