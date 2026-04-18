@@ -2,10 +2,28 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { tilesTable, visualizationEvents } from "@workspace/db";
 import { GenerateRoomVisualizationBody, GenerateMoodBoardBody } from "@workspace/api-zod";
-import { generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 const router = Router();
+
+const demoRoomImages: Record<string, string> = {
+  living_room: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
+  bedroom: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
+  kitchen: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&h=1200&fit=crop&q=80",
+  bathroom: "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=1200&h=1200&fit=crop&q=80",
+  dining_room: "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=1200&h=1200&fit=crop&q=80",
+  outdoor: "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=1200&h=1200&fit=crop&q=80",
+};
+
+const demoMoodBoardImages: Record<string, string> = {
+  modern: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&h=1200&fit=crop&q=80",
+  rustic: "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=1200&h=1200&fit=crop&q=80",
+  scandinavian: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
+  royal: "https://images.unsplash.com/photo-1544083183-a5bc87cf5b14?w=1200&h=1200&fit=crop&q=80",
+  industrial: "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=1200&h=1200&fit=crop&q=80",
+  bohemian: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&h=1200&fit=crop&q=80",
+  minimalist: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
+};
 
 router.post("/visualizer/generate", async (req, res) => {
   try {
@@ -27,15 +45,7 @@ router.post("/visualizer/generate", async (req, res) => {
     const roomName = roomType.replace(/_/g, " ");
     const tileDetail = `${tile.name} (${tile.finish} finish, ${tile.color} color, ${tile.size}cm, ${tile.category})`;
 
-    const prompt = `Professional interior design photograph of a beautiful ${roomName} with ${tileDetail} tiles installed. ${roomDescription ? roomDescription + "." : ""} The room features elegant modern Indian interior design with:
-- The ${tile.name} tiles prominently featured on the ${roomType.includes("bathroom") || roomType.includes("kitchen") ? "walls and floor" : "floor"}
-- Perfect lighting showcasing the ${tile.finish} finish and ${tile.color} tones
-- Premium furniture and decor complementing the tile aesthetic
-- Architectural photography style, 4K quality, realistic lighting
-- Style: ${tile.collection ?? "Contemporary"} collection aesthetic
-Photorealistic, magazine-quality interior design photo, no text or watermarks.`;
-
-    const imageBuffer = await generateImageBuffer(prompt, "1024x1024");
+    const prompt = `Demo room visualization for a ${roomName} using ${tileDetail}.${roomDescription ? ` ${roomDescription}` : ""}`;
 
     await db.insert(visualizationEvents).values({
       tileId,
@@ -43,10 +53,14 @@ Photorealistic, magazine-quality interior design photo, no text or watermarks.`;
       eventType: "room",
     }).catch(() => {});
 
+    const imageUrl = demoRoomImages[roomType] ?? demoRoomImages.living_room;
+
     res.json({
-      imageBase64: imageBuffer.toString("base64"),
+      imageUrl,
       prompt,
       tileDetails: tileDetail,
+      demoMode: true,
+      message: "Demo visualization generated successfully",
     });
   } catch (err) {
     req.log.error({ err }, "Error generating visualization");
@@ -66,35 +80,16 @@ router.post("/visualizer/mood-board", async (req, res) => {
 
     let tileContext = "";
     if (tileIds && tileIds.length > 0) {
-      const tiles = await db.select().from(tilesTable).limit(tileIds.length);
+      const tiles = await db
+        .select()
+        .from(tilesTable)
+        .where(inArray(tilesTable.id, tileIds))
+        .limit(tileIds.length);
+
       tileContext = tiles.map((t) => `${t.name} (${t.color}, ${t.finish})`).join(", ");
     }
 
-    const styleDescriptions: Record<string, string> = {
-      modern: "clean lines, minimalist, monochrome palette, geometric patterns, sleek surfaces",
-      rustic: "warm earthy tones, natural textures, terracotta and wood accents, cozy atmosphere",
-      scandinavian: "bright whites, natural light, simple functional design, hygge aesthetic, neutral palette",
-      royal: "opulent gold and cream tones, ornate patterns, marble-look tiles, grand architectural elements",
-      industrial: "exposed concrete, dark tones, metal accents, raw textures, urban loft aesthetic",
-      bohemian: "eclectic mix of colors and patterns, layered textures, cultural influences, vibrant energy",
-      minimalist: "maximum whitespace, single accent color, essential elements only, serene and calm",
-    };
-
-    const prompt = `Professional interior design mood board for a ${style} style ${roomType.replace(/_/g, " ")}.
-Design aesthetic: ${styleDescriptions[style] ?? style}
-${colorPalette ? `Color palette: ${colorPalette}` : ""}
-${tileContext ? `Featured Somany Ceramics tiles: ${tileContext}` : ""}
-
-Create a sophisticated mood board layout showing:
-- The complete interior space with tile application
-- Material samples and texture swatches
-- Color palette chips
-- Decorative elements and furniture pieces that complement the style
-- Professional design studio presentation quality
-- Typography labels for materials (minimal, elegant)
-Photorealistic collage, interior design magazine quality, 4K resolution.`;
-
-    const imageBuffer = await generateImageBuffer(prompt, "1024x1024");
+    const prompt = `Demo mood board for a ${style} style ${roomType.replace(/_/g, " ")}.${colorPalette ? ` Color palette: ${colorPalette}.` : ""}${tileContext ? ` Tiles: ${tileContext}.` : ""}`;
 
     await db.insert(visualizationEvents).values({
       tileId: tileIds?.[0] ?? null,
@@ -102,10 +97,14 @@ Photorealistic collage, interior design magazine quality, 4K resolution.`;
       eventType: "mood_board",
     }).catch(() => {});
 
+    const imageUrl = demoMoodBoardImages[style] ?? demoMoodBoardImages.modern;
+
     res.json({
-      imageBase64: imageBuffer.toString("base64"),
+      imageUrl,
       prompt,
       tileDetails: tileContext,
+      demoMode: true,
+      message: "Demo mood board generated successfully",
     });
   } catch (err) {
     req.log.error({ err }, "Error generating mood board");
