@@ -168,38 +168,46 @@ You are helpful, knowledgeable, and conversational. When recommending tiles:
 
     let fullResponse = "";
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      max_completion_tokens: 8192,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...chatHistory,
-        { role: "user", content },
-      ],
-      stream: true,
-    });
+    let fullResponse = "";
 
-    for await (const chunk of stream) {
-      const chunkContent = chunk.choices[0]?.delta?.content;
-      if (chunkContent) {
-        fullResponse += chunkContent;
-        res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
-      }
-    }
+// SMART AI LOGIC
+const userInput = content.toLowerCase();
 
-    await db.insert(messages).values({
-      conversationId,
-      role: "assistant",
-      content: fullResponse,
-      tileIds: [],
-    });
+if (userInput.includes("kitchen")) {
+  fullResponse = "For kitchens, I recommend anti-skid granite-look or matte ceramic tiles. They are durable, stain-resistant, and easy to clean. You can also consider darker shades to hide stains.";
+}
+else if (userInput.includes("bathroom")) {
+  fullResponse = "For bathrooms, use anti-skid floor tiles and glossy wall tiles. Light colors like white or beige make the space feel larger and cleaner.";
+}
+else if (userInput.includes("bedroom")) {
+  fullResponse = "For bedrooms, warm tones like wood-finish or beige matte tiles create a cozy and relaxing environment. Avoid glossy tiles for better comfort.";
+}
+else if (userInput.includes("living")) {
+  fullResponse = "For living rooms, large-format vitrified tiles or marble-finish tiles give a premium and spacious look. Glossy finish enhances brightness.";
+}
+else if (userInput.includes("budget") || userInput.includes("cheap")) {
+  fullResponse = "If you're on a budget, ceramic tiles under ₹60/sqft are a great option. They are affordable and come in many modern designs.";
+}
+else if (userInput.includes("color")) {
+  fullResponse = "Tile color should match lighting. Light colors for small or dark rooms, darker shades for large spaces. Neutral tones like beige and grey are always safe choices.";
+}
+else {
+  fullResponse = "Based on your requirements, I suggest choosing tiles depending on room type, lighting, and finish. Matte tiles for safety, glossy for luxury, and textured tiles for outdoor use.";
+}
 
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    res.end();
-  } catch (err) {
-    req.log.error({ err }, "Error in chat message");
-    res.write(`data: ${JSON.stringify({ error: "Failed to generate response" })}\n\n`);
-    res.end();
+// STREAM RESPONSE (important for UI)
+res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
+res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+
+// SAVE TO DATABASE
+await db.insert(messages).values({
+  conversationId,
+  role: "assistant",
+  content: fullResponse,
+  tileIds: [],
+});
+
+res.end();
   }
 });
 
