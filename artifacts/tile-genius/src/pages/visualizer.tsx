@@ -12,7 +12,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PulseLoading } from "@/components/shared/LoadingState";
-import { Layers, Image as ImageIcon, Sparkles, Download, Wand2, Palette } from "lucide-react";
+import { Image as ImageIcon, Sparkles, Download, Wand2, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -82,19 +82,28 @@ export default function Visualizer() {
     });
   };
 
+  const generatedImageBase64 =
+    visualizerMutation.data?.imageBase64 || moodBoardMutation.data?.imageBase64;
+
+  const generatedImageUrl =
+    visualizerMutation.data?.imageUrl || moodBoardMutation.data?.imageUrl;
+
+  const generatedImage = generatedImageBase64
+    ? `data:image/png;base64,${generatedImageBase64}`
+    : generatedImageUrl || "";
+
+  const isGenerating = visualizerMutation.isPending || moodBoardMutation.isPending;
+  const selectedTile = tiles.find((t) => String(t.id) === tileId);
+
   const handleDownload = () => {
-    const imageBase64 = visualizerMutation.data?.imageBase64 || moodBoardMutation.data?.imageBase64;
-    if (!imageBase64) return;
+    if (!generatedImage) return;
+
     const link = document.createElement("a");
-    link.href = `data:image/png;base64,${imageBase64}`;
-    link.download = `tilgenius-render-${Date.now()}.png`;
+    link.href = generatedImage;
+    link.download = `tilegenius-render-${Date.now()}.png`;
     link.click();
     toast.success("Image downloaded successfully!");
   };
-
-  const generatedImage = visualizerMutation.data?.imageBase64 || moodBoardMutation.data?.imageBase64;
-  const isGenerating = visualizerMutation.isPending || moodBoardMutation.isPending;
-  const selectedTile = tiles.find((t) => String(t.id) === tileId);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -144,7 +153,9 @@ export default function Visualizer() {
                         />
                         <div>
                           <p className="text-sm font-medium">{selectedTile.name}</p>
-                          <p className="text-xs text-muted-foreground">{selectedTile.sku} · {selectedTile.size}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {selectedTile.sku} · {selectedTile.size}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -158,14 +169,18 @@ export default function Visualizer() {
                       </SelectTrigger>
                       <SelectContent>
                         {ROOM_OPTIONS.map((r) => (
-                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          <SelectItem key={r.value} value={r.value}>
+                            {r.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Style Notes <span className="text-muted-foreground font-normal">(Optional)</span></label>
+                    <label className="text-sm font-medium">
+                      Style Notes <span className="text-muted-foreground font-normal">(Optional)</span>
+                    </label>
                     <Textarea
                       placeholder="e.g. Large windows, minimalist furniture, warm lighting..."
                       value={description}
@@ -178,11 +193,13 @@ export default function Visualizer() {
                     {isGenerating ? (
                       <>Rendering with AI...</>
                     ) : (
-                      <><Wand2 className="mr-2 h-4 w-4" /> Generate Room Render</>
+                      <>
+                        <Wand2 className="mr-2 h-4 w-4" /> Generate Room Render
+                      </>
                     )}
                   </Button>
                   <p className="text-xs text-muted-foreground text-center">
-                    Powered by gpt-image-1 · Takes ~10–20 seconds
+                    Demo visualizer mode enabled
                   </p>
                 </form>
               </TabsContent>
@@ -198,7 +215,9 @@ export default function Visualizer() {
                       </SelectTrigger>
                       <SelectContent>
                         {STYLE_OPTIONS.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                          <SelectItem key={s.value} value={s.value}>
+                            {s.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -212,14 +231,18 @@ export default function Visualizer() {
                       </SelectTrigger>
                       <SelectContent>
                         {ROOM_OPTIONS.map((r) => (
-                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          <SelectItem key={r.value} value={r.value}>
+                            {r.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Anchor Tile <span className="text-muted-foreground font-normal">(Optional)</span></label>
+                    <label className="text-sm font-medium">
+                      Anchor Tile <span className="text-muted-foreground font-normal">(Optional)</span>
+                    </label>
                     <Select value={tileId} onValueChange={setTileId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Choose a tile to anchor the board..." />
@@ -233,7 +256,9 @@ export default function Visualizer() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Include a specific tile to anchor the board's palette.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Include a specific tile to anchor the board's palette.
+                    </p>
                   </div>
 
                   <Button
@@ -244,11 +269,13 @@ export default function Visualizer() {
                     {isGenerating ? (
                       <>Compiling Mood Board...</>
                     ) : (
-                      <><Palette className="mr-2 h-4 w-4" /> Create Mood Board</>
+                      <>
+                        <Palette className="mr-2 h-4 w-4" /> Create Mood Board
+                      </>
                     )}
                   </Button>
                   <p className="text-xs text-muted-foreground text-center">
-                    Powered by gpt-image-1 · Takes ~10–20 seconds
+                    Demo mood board mode enabled
                   </p>
                 </form>
               </TabsContent>
@@ -271,7 +298,7 @@ export default function Visualizer() {
                   <PulseLoading />
                   <div className="text-center">
                     <p className="font-semibold text-foreground">Generating your visualization…</p>
-                    <p className="text-sm text-muted-foreground mt-1">gpt-image-1 is rendering a photorealistic scene</p>
+                    <p className="text-sm text-muted-foreground mt-1">Preparing a demo render for your selected tile</p>
                   </div>
                 </motion.div>
               ) : generatedImage ? (
@@ -283,8 +310,8 @@ export default function Visualizer() {
                   className="relative w-full h-full group"
                 >
                   <img
-                    src={`data:image/png;base64,${generatedImage}`}
-                    alt="AI Generated Visualization"
+                    src={generatedImage}
+                    alt="Generated Visualization"
                     className="w-full h-full object-contain bg-black/5 rounded-2xl"
                   />
                   <div className="absolute top-4 right-4">
@@ -310,7 +337,7 @@ export default function Visualizer() {
                   </div>
                   <h3 className="text-xl font-semibold mb-2">Ready to Visualize</h3>
                   <p className="text-muted-foreground">
-                    Select a tile and room type on the left, then click <strong>Generate</strong> to see the AI render.
+                    Select a tile and room type on the left, then click <strong>Generate</strong> to see the render.
                   </p>
                 </motion.div>
               )}
