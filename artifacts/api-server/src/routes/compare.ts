@@ -1,106 +1,87 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { tilesTable } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { inArray } from "drizzle-orm";
 
 const router = Router();
 
 router.post("/compare", async (req, res) => {
   try {
-    const { tileIds } = req.body as { tileIds?: unknown };
+    const tileIds = Array.isArray(req.body?.tileIds) ? req.body.tileIds : [];
 
-    if (
-      !Array.isArray(tileIds) ||
-      tileIds.length < 2 ||
-      tileIds.length > 3 ||
-      !tileIds.every((id) => typeof id === "number" && Number.isInteger(id) && id > 0)
-    ) {
-      res.status(400).json({ error: "Provide 2–3 valid tile IDs to compare." });
+    if (!tileIds.length) {
+      res.status(400).json({ error: "No tiles selected for comparison." });
       return;
     }
 
-    const validIds = tileIds as number[];
     const tiles = await db
       .select()
       .from(tilesTable)
-      .where(inArray(tilesTable.id, validIds));
+      .where(inArray(tilesTable.id, tileIds))
+      .limit(3);
 
-    if (tiles.length < 2) {
-      res.status(404).json({ error: "Could not find the requested tiles." });
+    if (!tiles.length) {
+      res.status(404).json({ error: "No matching tiles found." });
       return;
     }
 
-    const tileDescriptions = tiles.map((t) =>
-      `Tile: ${t.name} (SKU: ${t.sku})
-  Category: ${t.category} | Room: ${t.room} | Finish: ${t.finish}
-  Size: ${t.size} | Color: ${t.color}
-  Price: ₹${t.pricePerSqft} per sqft
-  Collection: ${t.collection || "Standard"}
-  Description: ${t.description || t.aiEmbeddingText || "Premium ceramic tile"}`
-    ).join("\n\n---\n\n");
+    const comparisonItems = tiles.map((tile, index) => {
+      const strengths: string[] = [];
 
-    const systemPrompt = `You are a professional interior design consultant and tile expert at SOMAI IntelliTile AI. 
-You provide precise, insightful comparisons that help customers make informed purchasing decisions.
-Be specific, refer to each tile by name, and give actionable recommendations. Keep your analysis sharp and concise.`;
+      if (tile.finish?.toLowerCase().includes("matte")) {
+        strengths.push("good slip resistance");
+      }
+      if (tile.finish?.toLowerCase().includes("glossy")) {
+        strengths.push("premium reflective finish");
+      }
+      if (tile.pattern?.toLowerCase().includes("wood")) {
+        strengths.push("warm natural wood-look appeal");
+      }
+      if (tile.pattern?.toLowerCase().includes("marble")) {
+        strengths.push("luxury marble-style appearance");
+      }
+      if ((tile.pricePerSqft ?? 0) <= 60) {
+        strengths.push("budget-friendly");
+      }
+      if ((tile.rating ?? 0) >= 4.5) {
+        strengths.push("high customer rating");
+      }
 
-    const userPrompt = `Compare these ${tiles.length} tiles across 4 dimensions. Return your response as a JSON object.
+      const strengthsText = strengths.length
+        ? strengths.join(", ")
+        : "balanced design and practical everyday use";
 
-TILES TO COMPARE:
-${tileDescriptions}
-
-Return this exact JSON structure (no markdown, raw JSON only):
-{
-  "summary": "A 2-sentence executive summary of the comparison",
-  "aesthetics": {
-    "heading": "Aesthetic Appeal",
-    "insights": [
-      {"tileName": "<tile name>", "analysis": "<2-3 sentence aesthetic analysis>", "score": <1-10>}
-    ],
-    "winner": "<name of tile with best overall aesthetic versatility>",
-    "winnerReason": "<one sentence why>"
-  },
-  "priceValue": {
-    "heading": "Price-Per-Value",
-    "insights": [
-      {"tileName": "<tile name>", "analysis": "<value for money analysis including durability and finish quality>", "score": <1-10>}
-    ],
-    "winner": "<name of tile with best price-to-value ratio>",
-    "winnerReason": "<one sentence why>"
-  },
-  "roomFit": {
-    "heading": "Best Room Fit",
-    "insights": [
-      {"tileName": "<tile name>", "bestRooms": ["<room1>", "<room2>"], "worstRooms": ["<room1>"], "analysis": "<why it fits or doesn't fit certain spaces>"}
-    ]
-  },
-  "overallWinner": {
-    "tileName": "<name of overall best tile>",
-    "reason": "<2-3 sentence compelling reason — for whom and why>"
-  }
-}`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.4,
-      response_format: { type: "json_object" },
+      return `${index + 1}. ${tile.name}
+• Category: ${tile.category}
+• Finish: ${tile.finish}
+• Color: ${tile.color}
+• Size: ${tile.size}
+• Price: ₹${tile.pricePerSqft}/sqft
+• Best for: ${tile.room}
+• Key strength: ${strengthsText}
+• Summary: ${tile.description}`;
     });
 
-    const raw = completion.choices[0]?.message?.content ?? "{}";
-    let analysis: Record<string, unknown>;
-    try {
-      analysis = JSON.parse(raw);
-    } catch {
-      analysis = { summary: raw };
-    }
+    const cheapest = [...tiles].sort(
+      (a, b) => (a.pricePerSqft ?? 0) - (b.pricePerSqft ?? 0)
+    )[0];
 
-    res.json({ tiles, analysis });
+    const topRated = [...tiles].sort(
+      (a, b) => (b.rating ?? 0) - (a.rating ?? 0)
+    )[0];
+
+    const recommendation = `Overall recommendation:
+- Best budget choice: ${cheapest.name}
+- Best rated choice: ${topRated.name}
+- Final suggestion: Choose based on room type, finish preference, lighting, and budget. Matte/textured finishes are better for safety, while glossy finishes create a more premium look.`;
+
+    res.json({
+      comparison: `${comparisonItems.join("\n\n")}\n\n${recommendation}`,
+      demoMode: true,
+      tilesCompared: tiles.length,
+    });
   } catch (err) {
-    console.error("Compare error:", err);
+    req.log.error({ err }, "Error generating comparison");
     res.status(500).json({ error: "Failed to generate comparison." });
   }
 });
