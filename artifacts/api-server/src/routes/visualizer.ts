@@ -6,25 +6,6 @@ import { eq, inArray } from "drizzle-orm";
 
 const router = Router();
 
-const demoRoomImages: Record<string, string> = {
-  living_room: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
-  bedroom: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
-  kitchen: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&h=1200&fit=crop&q=80",
-  bathroom: "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=1200&h=1200&fit=crop&q=80",
-  dining_room: "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=1200&h=1200&fit=crop&q=80",
-  outdoor: "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=1200&h=1200&fit=crop&q=80",
-};
-
-const demoMoodBoardImages: Record<string, string> = {
-  modern: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&h=1200&fit=crop&q=80",
-  rustic: "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=1200&h=1200&fit=crop&q=80",
-  scandinavian: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
-  royal: "https://images.unsplash.com/photo-1544083183-a5bc87cf5b14?w=1200&h=1200&fit=crop&q=80",
-  industrial: "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=1200&h=1200&fit=crop&q=80",
-  bohemian: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&h=1200&fit=crop&q=80",
-  minimalist: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80",
-};
-
 router.post("/visualizer/generate", async (req, res) => {
   try {
     const body = GenerateRoomVisualizationBody.safeParse(req.body);
@@ -45,7 +26,32 @@ router.post("/visualizer/generate", async (req, res) => {
     const roomName = roomType.replace(/_/g, " ");
     const tileDetail = `${tile.name} (${tile.finish} finish, ${tile.color} color, ${tile.size}cm, ${tile.category})`;
 
-    const prompt = `Demo room visualization for a ${roomName} using ${tileDetail}.${roomDescription ? ` ${roomDescription}` : ""}`;
+    const prompt = `Concept preview for a ${roomName} using ${tileDetail}.${roomDescription ? ` ${roomDescription}` : ""}`;
+
+    // ✅ SMART IMAGE MATCHING (FIXED)
+    let imageUrl = "";
+
+    if (roomType === "kitchen") {
+      imageUrl = tile.finish?.toLowerCase().includes("glossy")
+        ? "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&h=1200&fit=crop&q=80"
+        : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (roomType === "bathroom") {
+      imageUrl = "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (roomType === "bedroom") {
+      imageUrl = tile.pattern?.toLowerCase().includes("wood")
+        ? "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80"
+        : "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (roomType === "living_room") {
+      imageUrl = tile.pattern?.toLowerCase().includes("marble")
+        ? "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=1200&h=1200&fit=crop&q=80"
+        : "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else {
+      imageUrl = "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=1200&h=1200&fit=crop&q=80";
+    }
 
     await db.insert(visualizationEvents).values({
       tileId,
@@ -53,14 +59,12 @@ router.post("/visualizer/generate", async (req, res) => {
       eventType: "room",
     }).catch(() => {});
 
-    const imageUrl = demoRoomImages[roomType] ?? demoRoomImages.living_room;
-
     res.json({
       imageUrl,
       prompt,
       tileDetails: tileDetail,
       demoMode: true,
-      message: "Demo visualization generated successfully",
+      message: "Concept preview generated successfully",
     });
   } catch (err) {
     req.log.error({ err }, "Error generating visualization");
@@ -89,7 +93,29 @@ router.post("/visualizer/mood-board", async (req, res) => {
       tileContext = tiles.map((t) => `${t.name} (${t.color}, ${t.finish})`).join(", ");
     }
 
-    const prompt = `Demo mood board for a ${style} style ${roomType.replace(/_/g, " ")}.${colorPalette ? ` Color palette: ${colorPalette}.` : ""}${tileContext ? ` Tiles: ${tileContext}.` : ""}`;
+    const prompt = `Concept mood board for a ${style} style ${roomType.replace(/_/g, " ")}.${colorPalette ? ` Color palette: ${colorPalette}.` : ""}${tileContext ? ` Tiles: ${tileContext}.` : ""}`;
+
+    // ✅ BETTER STYLE MATCHING
+    let imageUrl = "";
+
+    if (style === "modern") {
+      imageUrl = "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (style === "rustic") {
+      imageUrl = "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (style === "scandinavian") {
+      imageUrl = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (style === "royal") {
+      imageUrl = "https://images.unsplash.com/photo-1544083183-a5bc87cf5b14?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else if (style === "industrial") {
+      imageUrl = "https://images.unsplash.com/photo-1484154218962-a5bc87cf5b14?w=1200&h=1200&fit=crop&q=80";
+    } 
+    else {
+      imageUrl = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&h=1200&fit=crop&q=80";
+    }
 
     await db.insert(visualizationEvents).values({
       tileId: tileIds?.[0] ?? null,
@@ -97,14 +123,12 @@ router.post("/visualizer/mood-board", async (req, res) => {
       eventType: "mood_board",
     }).catch(() => {});
 
-    const imageUrl = demoMoodBoardImages[style] ?? demoMoodBoardImages.modern;
-
     res.json({
       imageUrl,
       prompt,
       tileDetails: tileContext,
       demoMode: true,
-      message: "Demo mood board generated successfully",
+      message: "Concept mood board generated successfully",
     });
   } catch (err) {
     req.log.error({ err }, "Error generating mood board");
